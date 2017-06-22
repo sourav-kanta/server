@@ -9,6 +9,7 @@ import numpy
 from scipy.misc import imread
 from django.conf import settings
 from PIL import Image
+from io import BytesIO
 
 vidhan_soudha_speech="The Vidhana Soudha located in Bengaluru, is the seat of the state legislature of Karnataka.[1] It is an imposing building, constructed in a style sometimes described as Mysore Neo-Dravidian, and incorporates elements of Indo-Saracenic and Dravidian styles. The construction was completed in 1956.The Vidhana Soudha has four floors above and one floor below ground level and sprawls across an area of 2,300 by 1,150 feet (700 m × 350 m). It is the largest Legislative building in India. Its eastern face has a porch with 12 granite columns, 40 feet (12 m) feet tall. Leading to the foyer is a flight of stairs with 45 steps, more than 200 feet (61 m) wide. The central dome, 60 feet (18 m) in diameter, is crowned by a likeness of the Indian national emblem."
 taj_mahal_speech="The Taj Mahal ( meaning Crown of the Palace) is an ivory-white marble mausoleum on the south bank of the Yamuna river in the Indian city of Agra. It was commissioned in 1632 by the Mughal emperor, Shah Jahan (reigned 1628–1658), to house the tomb of his favourite wife, Mumtaz Mahal. The tomb is the centrepiece of a 17-hectare (42-acre) complex, which includes a mosque and a guest house, and is set in formal gardens bounded on three sides by a crenellated wall.Construction of the mausoleum was essentially completed in 1643 but work continued on other phases of the project for another 10 years. The Taj Mahal complex is believed to have been completed in its entirety in 1653 at a cost estimated at the time to be around 32 million rupees, which in 2015 would be approximately 52.8 billion rupees (US$827 million). The construction project employed some 20,000 artisans under the guidance of a board of architects led by the court architect to the emperor, Ustad Ahmad Lahauri."
@@ -20,20 +21,25 @@ error_json={}
 
 model=settings.MODEL 
 
-def process_file(path):
-    img=imread(path)
-    np_img=numpy.asarray(img).astype('float32')/255.0    
+def process_file(img):
+    #img=imread(path)
+    output = BytesIO()
+    img.save(output, format='JPEG')
+    output.seek(0)
+    newimg=Image.open(output)
+    np_img=numpy.asarray(newimg).astype('float32')/255.0    
     #print np_img.shape
     return np_img
 
-def resize_image(path,item,dimX=None,dimY=None):
+def resize_image(data,dimX=None,dimY=None):
     if not dimX:
         dimX=64
     if not dimY:
         dimY=64
-    im=Image.open(os.path.join(path,item))
+    im=Image.open(BytesIO(data))
     imResize = im.resize((dimX,dimY), Image.ANTIALIAS)
-    imResize.save(os.path.join(path,item), 'JPEG', quality=90)
+    #imResize.save(os.path.join(path,item), 'JPEG', quality=90)
+    return imResize
 
 
 @csrf_exempt
@@ -42,19 +48,20 @@ def index(request):
         return HttpResponse("This is the api gateway for the application")
     try:        
     	image_base64=request.POST['image'];
-    	f_name=str(int(time.time()*100))+".jpg"
+    	#f_name=str(int(time.time()*100))+".jpg"
     	#print f_name
     	#return HttpResponse(image_base64)
-    	if not os.path.exists("media/uploads"):
-    		os.makedirs("media/uploads");
-    	with open("media/uploads/"+f_name, "wb") as fh:
-    		fh.write(base64.decodestring(str(image_base64)))
-    		fh.close()
-        resize_image("media/uploads/",f_name);
+    	#if not os.path.exists("media/uploads"):
+    	#	os.makedirs("media/uploads");
+    	#with open("media/uploads/"+f_name, "wb") as fh:
+    	#	fh.write(base64.decodestring(str(image_base64)))
+    	#	fh.close()
+        decoded_data=base64.decodestring(str(image_base64))
+        imagedata=resize_image(decoded_data);
         
         # Process Test Data
 
-        test_img=process_file("media/uploads/"+f_name);
+        test_img=process_file(imagedata);
         print "Predicting"
         res=model.predict(numpy.stack([test_img]))
         print res
@@ -70,7 +77,7 @@ def index(request):
         success_json['output']=output
         success_json['status']=1
 
-        print f_name," has a prediction of : ",output," with ",res[0]
+        print "Upload has a prediction of : ",output," with ",res[0]
         return HttpResponse(json.dumps(success_json), content_type="application/json")
     except Exception,e:
     	print str(e)
