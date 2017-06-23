@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
 import os
-from keras.models import load_model
+from keras.models import model_from_json
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -127,4 +127,10 @@ STATIC_URL = '/static/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
-MODEL=load_model("test_model.h5")
+json_file=open("model.json","r")
+loaded_json=json_file.read()
+json_file.close()
+    
+model=model_from_json(loaded_json)
+model.load_weights("model.h5")
+MODEL=model
